@@ -1,0 +1,39 @@
+stages:
+- App-build
+- App-image-publish-quay
+
+
+variables:
+  SPRING_PROFILES_ACTIVE: "prod"
+  QUAY_REGISTRY: quay.io
+  QUAY_IMAGE_NAME: upskillondevops/springboot
+#  IMAGE_TAG: latest
+
+App-build:
+  stage: App-build
+  image: maven:latest
+  script:
+    - mvn clean install
+    - ls
+  artifacts:
+    paths:
+      - target/
+
+App-image-publish-quay:
+  stage: App-image-publish-quay
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  before_script:
+  - apk --no-cache add python3 py3-pip unzip curl
+  - pip3 install awscliv2
+  - docker --version
+  - awsv2 --version
+  script:
+    # - COMMIT_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+    - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+    - docker build -t $QUAY_REGISTRY/$QUAY_IMAGE_NAME:$IMAGE_TAG .
+    - docker login -u $QUAY_USERNAME -p $QUAY_PASSWORD $QUAY_REGISTRY
+    - docker push $QUAY_REGISTRY/$QUAY_IMAGE_NAME:$IMAGE_TAG
+  dependencies:
+    - App-build

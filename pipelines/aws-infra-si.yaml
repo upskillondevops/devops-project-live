@@ -1,0 +1,83 @@
+stages:
+- pre-req
+- s3-creation
+- copy-files
+- api-creation
+
+variables:
+  AWS_REGION: us-east-1
+  # Images
+  AWS_CLI_IMAGE: nexus-docker.enterprise-tools.aws.delta.com/amazon/aws-cli:2.11.3
+
+
+
+.aws-cft-deployment: &aws-cft-deployment
+- "set -x \nif ! aws cloudformation describe-stacks --region $AWS_REGION --stack-name $STACK_NAME >/dev/null 2>/dev/null; then\n    echo \"Stack does not exist - creating new stack\"      \n    aws cloudformation create-stack --stack-name $STACK_NAME --region $AWS_REGION  \\\n        --template-body file://$CFT_TEMPLATE --parameters file://$STACK_PARAMS \\\n        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \\\n        --tags file://$STACK_TAGS\n    aws cloudformation wait stack-create-complete --region $AWS_REGION --stack-name $STACK_NAME\nelse\n    echo \"Stack does exists - updating stack\"\n    aws cloudformation deploy --stack-name $STACK_NAME --region $AWS_REGION  \\\n        --template-file $CFT_TEMPLATE --parameter-overrides file://$STACK_PARAMS \\\n        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \\\n        --tags Blockcode=$BLOCKCODE --no-fail-on-empty-changeset \n    aws cloudformation wait stack-update-complete --region $AWS_REGION --stack-name $STACK_NAME\nfi\n"
+
+
+pre-req:
+  stage: pre-req
+  image:
+    name: $AWS_CLI_IMAGE
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: aws-infra/SI/api/pre-reqs/pre-reqs_iac-aws-prerequisites.yaml
+    STACK_NAME: tobs-api-si-pre-reqs
+    STACK_PARAMS: aws-infra/SI/api/pre-reqs/pre-reqs_iac-aws-prerequisites-params-si.json
+    STACK_TAGS: aws-infra/SI/tags.json
+    BLOCKCODE: toppattobs
+  script:
+    - *assume-role
+    - *aws-cft-deployment
+  rules:
+    - when: on_success
+
+s3:
+  stage: s3-creation
+  image:
+    name: $AWS_CLI_IMAGE
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: aws-infra/SI/api/s3/s3.yaml
+    STACK_NAME: tobs-api-si-s3
+    STACK_PARAMS: aws-infra/SI/api/s3/s3-params-si.json
+    STACK_TAGS: aws-infra/SI/tags.json
+    BLOCKCODE: toppattobs
+  script:
+  - *assume-role
+  - *aws-cft-deployment
+  rules:
+  - when: on_success
+
+copyfiles:
+  stage: copy-files
+  image:
+    name: $AWS_CLI_IMAGE
+    entrypoint: [""]
+  script:
+  - *assume-role
+  - ls -al
+  - pwd
+  - cd aws-infra/SI/api/scripts
+  - chmod +x copy-to-s3.sh
+  - ./copy-to-s3.sh
+  - pwd
+  - ls -al
+api-creation:
+  stage: api-creation
+  image:
+    name: $AWS_CLI_IMAGE
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: aws-infra/SI/api/api/offer-api-gateway-pub.yaml
+    STACK_NAME: tobs-api-si-ApiGW
+    STACK_PARAMS: aws-infra/SI/api/api/iac_aws_api-gateway-pub-params-si.json
+    STACK_TAGS: aws-infra/SI/tags.json
+    BLOCKCODE: toppattobs
+  script:
+  - *assume-role
+  - *aws-cft-deployment
+  rules:
+  - when: on_success
+
+

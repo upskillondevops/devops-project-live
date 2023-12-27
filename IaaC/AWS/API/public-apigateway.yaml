@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: This template deploys a Public api on ROSA
+Parameters:
+  APIName:
+    Type: String
+    Description: Name of the API.
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket.
+  APIContractFile:
+    Type: String
+    Description: The name of the Swagger/OpenAPI (yaml or json) contract file.
+    Default: swagger.yaml
+  APIStageID:
+    Type: String
+    Description: The name of the stage to deploy the API to.
+    Default: dev
+  usagePlanName:
+    Description: Usage plan name
+    Type: String
+  DelegateRole:
+    Type: String
+    Description: The value for the API Gateway Role
+    Default: delegate-admin-api-gateway-execution-role
+Resources:
+  usageplan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: APIDeployment
+    Properties:
+      ApiStages:
+      - ApiId: !Ref api
+        Stage: !Ref APIStageID
+      Description: API rate limiter
+      Quota:
+        Limit: 2000
+        Offset: 0
+        Period: DAY
+      Throttle:
+        BurstLimit: 30
+        RateLimit: 10
+      UsagePlanName: !Ref usagePlanName
+
+  api:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref APIName
+      Body:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: !Sub s3://${S3BucketName}/${APIContractFile}
+      EndpointConfiguration:
+        Types:
+        - REGIONAL
+      Policy:
+        Version: "2008-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal: "*"
+          Action: "execute-api:Invoke"
+          Resource:
+          - execute-api:/*
+
+
+  ## api gateway log 
+  apiGatewayDevLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/api-gateway/${APIName}"
+      RetentionInDays: 1
+  ## api gateway log ends
+
+  APIDeployment:
+    DependsOn: api
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref api
+      Description: My deployment
+      StageName: !Ref APIStageID
+
+  apiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    DependsOn: apiGatewayIAMRole
+    Properties:
+      CloudWatchRoleArn: !GetAtt apiGatewayIAMRole.Arn
+
+
+  apiGatewayIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref DelegateRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action: "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: create-logs
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+            - logs:GetLogEvents
+            - logs:FilterLogEvents
+            Resource: "*"
+

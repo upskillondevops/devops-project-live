@@ -1,0 +1,11 @@
+stages:
+- cleanup
+cleanup:
+  stage: cleanup
+  image:
+    name: $AWS_CLI_IMAGE
+    entrypoint: [""]
+  script:
+    - *assume-role
+    - pwd
+    - ls

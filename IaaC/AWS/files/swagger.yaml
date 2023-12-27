@@ -1,0 +1,22 @@
+swagger: '2.0'
+info:
+  title: APP-MOD&APP-CONT
+  version: '1.0'
+schemes:
+  - https
+paths:
+  /:
+    get:
+      summary: Get a greeting
+      responses:
+        '200':
+          description: Successful response
+      x-amazon-apigateway-integration:
+        type: http
+        httpMethod: GET
+        uri: https://dev-release-spring-boot-upskillondevops-dev.apps.sandbox-m3.1530.p1.openshiftapps.com/
+        responses:
+          default:
+            statusCode: '200'
+            responseTemplates:
+              application/json: ''

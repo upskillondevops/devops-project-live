@@ -1,0 +1,80 @@
+stages:
+- test
+- ci-dev
+- cd-dev
+- cd-si
+- cd-prod
+- infra
+
+variables:
+  DOCKER_REGISTRY: XXXXXXXX.dkr.ecr.us-east-1.amazonaws.com
+#  MANUAL_TRIGGER: "false"
+
+
+sast:
+  stage: test
+include:
+- template: Security/SAST.gitlab-ci.yml
+
+ci-dev:
+  stage: ci-dev
+  trigger:
+    include:
+      - local: pipelines/ci-dev.yaml
+    strategy: depend
+  rules:
+  - if: $CD_DEPLOY != "SI" && $CD_DEPLOY != "PROD" && $INFRA != "AWS"
+
+cd-dev:
+  stage: cd-dev
+  trigger:
+    include:
+      - local: pipelines/cd-dev.yaml
+    strategy: depend
+  needs:
+    - job: ci-dev
+  rules:
+  - if: $CD_DEPLOY != "SI" && $CD_DEPLOY != "PROD" && $INFRA != "AWS"
+
+cd-si:
+  stage: cd-si
+  trigger:
+    include:
+      - local: pipelines/cd-si.yaml
+    strategy: depend
+  allow_failure: false
+  rules:
+    - if: $CD_DEPLOY == "SI"
+
+
+cd-prod:
+  stage: cd-prod
+  trigger:
+    include:
+      - local: pipelines/cd-prod.yaml
+    strategy: depend
+  allow_failure: false
+  rules:
+    - if: $CD_DEPLOY == "PROD"
+####------AWS-DEV----#########
+infra-valid:
+  stage: infra
+  trigger:
+    include:
+      - local: pipelines/aws-validation.yaml
+    strategy: depend
+  allow_failure: true
+  rules:
+    - if: $INFRA == "AWS"
+
+infra-deploy:
+  stage: infra
+  trigger:
+    include:
+      - local: pipelines/aws-infra-dev.yaml
+    strategy: depend
+  allow_failure: false
+  rules:
+    - if: $INFRA == "AWS"
+  needs:
+    - job: infra-valid

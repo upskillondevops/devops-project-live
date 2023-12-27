@@ -1,0 +1,26 @@
+[
+    {
+        "ParameterKey": "APIName",
+        "ParameterValue": "APPMOD-APPCONT"
+    },
+    {
+        "ParameterKey": "S3BucketName",
+        "ParameterValue": "appmod-appcont-dev-swagger-bucket"
+    },
+    {
+        "ParameterKey": "APIStageID",
+        "ParameterValue": "dev"
+    },
+    {
+        "ParameterKey": "APIContractFile",
+        "ParameterValue": "swagger.yaml"
+    },
+    {
+        "ParameterKey": "DelegateRole",
+        "ParameterValue": "delegate-admin-APP-MOD-APP-CONT-dev-api-gateway-execution-role"
+    },
+    {
+        "ParameterKey": "usagePlanName",
+        "ParameterValue": "APP-MOD-APP-CONT-dev-APIRateLimiter"
+    }
+]

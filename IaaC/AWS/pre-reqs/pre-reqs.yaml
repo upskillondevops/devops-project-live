@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  KeyAlias:
+    Type: String
+    Description: The alias for the KMS Master Key
+    Default: "APPMOD-APPCONT"
+
+Resources:
+  MyKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "My KMS Master Key"
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "key-default-1"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+              - "kms:PutKeyPolicy"
+            Resource: "*"
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:CreateAlias"
+              - "kms:ListAliases"
+              - "kms:DeleteAlias"
+            Resource: "*"
+          - Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:CreateKey"
+              - "kms:DescribeKey"
+            Resource: "*"
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action:
+              - "kms:CreateAlias"
+              - "kms:ListAliases"
+              - "kms:DeleteAlias"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:CallerAccount:
+                  Ref: AWS::AccountId
+
+  MyKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/${KeyAlias}"
+      TargetKeyId: !Ref MyKMSKey
+
+  KMSKeyIdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/MyApp/KMSKeyId"
+      Type: "String"
+      Value: !Ref MyKMSKey

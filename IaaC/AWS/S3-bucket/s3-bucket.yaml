@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This templates creates  S3 bucket for swagger file store.
+
+Parameters:
+  SwaggerBucket:
+    Type: String
+    Description: The name of the S3 Bucket
+    AllowedPattern: "^([a-z0-9]{1}[a-z0-9-]{1,61}[a-z0-9]{1})$"
+  KmsMasterKeyAlias:
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: KMS service catalog value pulled from parameters store
+  S3LoggingBucketName:
+    Type: String
+    Description: S3LoggingBucketName
+    AllowedPattern: "^([a-z0-9]{1}[a-z0-9-]{1,61}[a-z0-9]{1})$"
+
+
+Resources:
+  Bucket1:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref SwaggerBucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: aws:kms
+            KMSMasterKeyID: !Ref KmsMasterKeyAlias
+      LoggingConfiguration:
+        DestinationBucketName: !Ref S3LoggingBucket
+        LogFilePrefix: !Ref SwaggerBucket
+      MetricsConfigurations:
+      - Id: !Ref SwaggerBucket
+
+  SwaggerBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref SwaggerBucket
+      PolicyDocument:
+        Statement:
+        - Sid: AllowSSLRequestsOnly
+          Effect: Deny
+          Principal: "*"
+          Action: s3:*
+          Resource: !Sub "${Bucket1.Arn}/*"
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+  S3LoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3LoggingBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      ##AccessControl: LogDeliveryWrite
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: aws:kms
+            KMSMasterKeyID: !Ref KmsMasterKeyAlias
+
+  LoggingBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref S3LoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Sid: LoggingAccountBucketPermission
+          Effect: Allow
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root/'
+          Action:
+          - 's3:GetBucketLocation'
+          - 's3:ListBucket'
+          Resource: !GetAtt S3LoggingBucket.Arn
+        - Sid: LoggingAccountObjectPermission
+          Effect: Allow
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root/'
+          Action:
+          - 's3:GetObject'
+          Resource: !Sub "${S3LoggingBucket.Arn}/*"
+        - Sid: AllowSSLRequestsOnly
+          Effect: Deny
+          Principal: "*"
+          Action: s3:*
+          Resource: !Sub "${S3LoggingBucket.Arn}/*"
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'

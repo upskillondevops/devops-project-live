@@ -1,0 +1,92 @@
+stages:
+- pre-req
+- s3-creation
+- copy-files
+- api-creation
+
+variables:
+  AWS_REGION: us-east-1
+#script to deploy the cft in the aws environments.
+.aws-cft-deployment: &aws-cft-deployment
+  - >
+    set -x
+
+    if ! aws cloudformation describe-stacks --region $AWS_REGION --stack-name $STACK_NAME >/dev/null 2>/dev/null; then
+        echo "Stack does not exist - creating new stack"
+        aws cloudformation create-stack --stack-name $STACK_NAME --region $AWS_REGION  \
+            --template-body file://$CFT_TEMPLATE --parameters file://$STACK_PARAMS \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --tags file://$STACK_TAGS
+        aws cloudformation wait stack-create-complete --region $AWS_REGION --stack-name $STACK_NAME
+    else
+        echo "Stack does exists - updating stack"
+        aws cloudformation deploy --stack-name $STACK_NAME --region $AWS_REGION  \
+            --template-file $CFT_TEMPLATE --parameter-overrides file://$STACK_PARAMS \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --tags APPCODE=$APPCODE --no-fail-on-empty-changeset
+        aws cloudformation wait stack-update-complete --region $AWS_REGION --stack-name $STACK_NAME
+    fi
+
+pre-req:
+  stage: pre-req
+  image:
+    name: amazon/aws-cli:latest  # Use the latest version of the AWS CLI image
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: IaaC/AWS/pre-reqs/pre-reqs.yaml
+    STACK_NAME: APPMOD-APPCONT-pre-reqs
+    STACK_PARAMS: IaaC/AWS/pre-reqs/pre-reqs-dev-params.json
+    STACK_TAGS: tags.json
+    APPCODE: A12345
+  script:
+    - *aws-cft-deployment
+  rules:
+    - when: on_success
+
+s3:
+  stage: s3-creation
+  image:
+    name: amazon/aws-cli:latest  # Use the latest version of the AWS CLI image
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: IaaC/AWS/S3-bucket/s3-bucket.yaml
+    STACK_NAME: APPMOD-APPCONT-s3
+    STACK_PARAMS: IaaC/AWS/S3-bucket/s3-dev-params.json
+    STACK_TAGS: tags.json
+    APPCODE: A12345
+  script:
+  - *aws-cft-deployment
+  rules:
+  - when: on_success
+
+copyfiles:
+  stage: copy-files
+  image:
+    name: amazon/aws-cli:latest  # Use the latest version of the AWS CLI image
+    entrypoint: [""]
+  script:
+  - ls -al
+  - pwd
+  - cd /builds/upskillondevops/upskillndevops/IaaC/AWS/scripts
+  - ls
+  - chmod +x copy-to-s3-swagger.sh
+  - ./copy-to-s3-swagger.sh
+  - pwd
+  - ls -al
+api-creation:
+  stage: api-creation
+  image:
+    name: amazon/aws-cli:latest  # Use the latest version of the AWS CLI image
+    entrypoint: [""]
+  variables:
+    CFT_TEMPLATE: IaaC/AWS/API/public-apigateway.yaml
+    STACK_NAME: APPMOD-APPCONT-api
+    STACK_PARAMS:  IaaC/AWS/API/public-api-dev-params.json
+    STACK_TAGS: tags.json
+    APPCODE: A12345
+  script:
+  - *aws-cft-deployment
+  rules:
+  - when: on_success
+
+

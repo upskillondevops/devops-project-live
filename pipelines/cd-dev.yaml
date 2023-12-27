@@ -1,0 +1,44 @@
+stages:
+- helm-valid
+- deploy-dev
+
+variables:
+  HELM_CHART_PATH: "IaaC/ROSA/DEV/spring-boot"
+  OPENSHIFT_SERVER: "https://api.sandbox-m3.1530.p1.openshiftapps.com:6443"
+  OPENSHIFT_TOKEN: "sha256~b8TPyxx8d2WiQlu9PeUBYPj4sujlklbEGDoqxQ1LHz0"
+  OPENSHIFT_PROJECT_DEV: "upskillondevops-dev"
+  HELM_RELEASE_NAME_DEV: "dev-release"
+  HELM_VALUES_FILE: "IaaC/ROSA/DEV/spring-boot/values.yaml"
+  HELM_CONTENT: "IaaC/ROSA/DEV/spring-boot"
+  HELM_VERSION: "v3.8.0"
+  QUAY_REGISTRY: quay.io
+  QUAY_IMAGE_NAME: upskillondevops/springboot
+#  IMAGE_TAG: 20231204142352
+
+before_script:
+  - apt-get update
+  - apt-get install -y ca-certificates bash git
+  - wget https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz
+  - tar -zxvf helm-$HELM_VERSION-linux-amd64.tar.gz
+  - mv linux-amd64/helm /usr/local/bin/helm
+  - wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
+  - tar -zxvf openshift-client-linux.tar.gz
+  - mv oc /usr/local/bin/oc
+  - oc version
+  - helm version
+
+helm-valid:
+  stage: helm-valid
+  script:
+    - pwd
+    - ls
+    - helm lint $HELM_CONTENT
+    - helm template $HELM_CONTENT
+
+deploy-dev:
+  stage: deploy-dev
+  script:
+    - export IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+    - oc login $OPENSHIFT_SERVER --token=$OPENSHIFT_TOKEN --insecure-skip-tls-verify=true
+    - oc project $OPENSHIFT_PROJECT_DEV
+    - helm upgrade --install $HELM_RELEASE_NAME_DEV $HELM_CHART_PATH --namespace=$OPENSHIFT_PROJECT_DEV --values=$HELM_VALUES_FILE --set image.tag=$IMAGE_TAG

@@ -1,0 +1,39 @@
+
+stages:
+  - "lint"
+  - "validate"
+
+variables:
+  AWS_REGION: us-east-1
+  CFN_DIRECTORY: "IaaC/AWS"
+
+
+cfn-lint:
+  stage: lint
+  script:
+    - apt-get update -qy
+    - apt-get install -y python3-venv
+    - python3 -m venv venv
+    - source venv/bin/activate
+    - pip install cfn-lint
+    - cfn-lint --debug ${CFN_DIRECTORY}/**/*.yaml  --format sarif || true
+
+cfn-nag:
+  stage: lint
+  allow_failure: true
+  script:
+    - echo "Executing CFN Nag"
+    - apt-get update -qy
+    - apt-get install -y ruby-full
+    - gem install cfn-nag
+    - cfn_nag_scan --input-path ${CFN_DIRECTORY} --output-format json | tee cfn_nag_report.out
+
+cloudformation-validation:
+  stage: validate
+  image:
+    name: amazon/aws-cli:latest  # Use the latest version of the AWS CLI image
+    entrypoint: [""]
+  script:
+#    - apt-get install -y aws-cli
+    - echo "${CFN_DIRECTORY}"
+    - find ${CFN_DIRECTORY} -type f -name "*.yaml" -exec aws cloudformation validate-template --region ${AWS_REGION} --template-body file://{} \;

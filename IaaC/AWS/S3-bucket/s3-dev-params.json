@@ -1,0 +1,14 @@
+[
+    {
+        "ParameterKey": "SwaggerBucket",
+        "ParameterValue": "appmod-appcont-dev-swagger-bucket"
+    },
+    {
+        "ParameterKey": "S3LoggingBucketName",
+        "ParameterValue": "appmod-appcont-dev-logging"
+    },
+    {
+        "ParameterKey": "KmsMasterKeyAlias",
+        "ParameterValue": "/MyApp/KMSKeyId"
+    }
+]
